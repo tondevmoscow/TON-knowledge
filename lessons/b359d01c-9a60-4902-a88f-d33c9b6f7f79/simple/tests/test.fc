@@ -1,0 +1,38 @@
+[int, tuple, cell, tuple, int] test_internal_message() method_id(0) {
+	int function_selector = 0;
+
+	cell message = begin_cell()
+				.store_uint(1618, 32)
+				.end_cell();
+
+	tuple stack = unsafe_tuple([message.begin_parse()]);
+    
+    cell owner_addr = begin_cell()
+			.store_uint(1, 2)
+			.store_uint(5, 9) 
+			.store_uint(8, 5)
+            .end_cell();
+
+    cell data = begin_cell()
+            .store_uint(0, 32)
+            .store_uint(0, 32)
+            .store_uint(0, 32)
+            .store_uint(0, 32)
+            .store_slice(owner_addr.begin_parse())
+            .store_uint(1, 256)
+            .end_cell();
+
+
+	return [function_selector, stack, data, get_c7(), null()];
+}
+
+
+_ test_example(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+	throw_if(100, exit_code != 0);
+
+	var ds = data.begin_parse();
+    ds~load_uint(32); ;; skip external_counter
+
+	throw_if(101, ds~load_uint(32) != 10);
+	throw_if(102, gas > 1000000); 
+}

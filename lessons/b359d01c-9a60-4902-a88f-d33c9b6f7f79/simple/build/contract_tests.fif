@@ -1,0 +1,76 @@
+"Asm.fif" include
+// automatically generated from `/Users/akkireev/Library/Application Support/toncli/func-libs/stdlib-tests.func` `/Users/akkireev/Library/Application Support/toncli/func-libs/tests-helpers.func` `/Users/akkireev/Documents/blockchain/my/dev/lessons/advanced_counter/simple/tests/test.fc` 
+PROGRAM{
+  85860 DECLMETHOD get_c7
+  0 DECLMETHOD test_internal_message
+  1 DECLMETHOD test_example
+  get_c7 PROC:<{
+    // 
+    124711402 PUSHINT	//  _2=124711402
+    0 PUSHINT	//  _2=124711402 _3=0
+    DUP	//  _2=124711402 _3=0 _4=0
+    NOW	//  _2=124711402 _3=0 _4=0 _5
+    1 PUSHINT	//  _2=124711402 _3=0 _4=0 _5 _6=1
+    DUP	//  _2=124711402 _3=0 _4=0 _5 _6=1 _7=1
+    239 PUSHINT	//  _2=124711402 _3=0 _4=0 _5 _6=1 _7=1 _8=239
+    1000000000 PUSHINT	//  _2=124711402 _3=0 _4=0 _5 _6=1 _7=1 _8=239 _10=1000000000
+    PUSHNULL	//  _2=124711402 _3=0 _4=0 _5 _6=1 _7=1 _8=239 _10=1000000000 _11
+    PAIR	//  _2=124711402 _3=0 _4=0 _5 _6=1 _7=1 _8=239 _12
+    MYADDR	//  _2=124711402 _3=0 _4=0 _5 _6=1 _7=1 _8=239 _12 _13
+    CONFIGROOT	//  _2=124711402 _3=0 _4=0 _5 _6=1 _7=1 _8=239 _12 _13 _14
+    10 TUPLE	//  _15
+    SINGLE	//  _16
+  }>
+  test_internal_message PROC:<{
+    // 
+    0 PUSHINT	//  function_selector=0
+    1618 PUSHINT	//  function_selector=0 _3=1618
+    NEWC	//  function_selector=0 _3=1618 _4
+    32 STU	//  function_selector=0 _6
+    ENDC	//  function_selector=0 message
+    CTOS	//  function_selector=0 _10
+    SINGLE	//  function_selector=0 stack
+    8 PUSHINT	//  function_selector=0 stack _13=8
+    5 PUSHINT	//  function_selector=0 stack _13=8 _14=5
+    1 PUSHINT	//  function_selector=0 stack _13=8 _14=5 _15=1
+    NEWC	//  function_selector=0 stack _13=8 _14=5 _15=1 _16
+    2 STU	//  function_selector=0 stack _13=8 _14=5 _18
+    9 STU	//  function_selector=0 stack _13=8 _20
+    5 STU	//  function_selector=0 stack _22
+    ENDC	//  function_selector=0 stack owner_addr
+    1 PUSHINT	//  function_selector=0 stack owner_addr _25=1
+    s3 s3 s3 PUSH3	//  function_selector=0 stack owner_addr _25=1 _26=0 _27=0 _28=0
+    DUP	//  function_selector=0 stack owner_addr _25=1 _26=0 _27=0 _28=0 _29=0
+    NEWC	//  function_selector=0 stack owner_addr _25=1 _26=0 _27=0 _28=0 _29=0 _30
+    32 STU	//  function_selector=0 stack owner_addr _25=1 _26=0 _27=0 _28=0 _32
+    32 STU	//  function_selector=0 stack owner_addr _25=1 _26=0 _27=0 _34
+    32 STU	//  function_selector=0 stack owner_addr _25=1 _26=0 _36
+    32 STU	//  function_selector=0 stack owner_addr _25=1 _38
+    s0 s2 XCHG	//  function_selector=0 stack _38 _25=1 owner_addr
+    CTOS	//  function_selector=0 stack _38 _25=1 _39
+    s1 s2 XCHG	//  function_selector=0 stack _25=1 _38 _39
+    STSLICER	//  function_selector=0 stack _25=1 _40
+    256 STU	//  function_selector=0 stack _42
+    ENDC	//  function_selector=0 stack data
+    get_c7 INLINECALLDICT	//  function_selector=0 stack data _45
+    PUSHNULL	//  function_selector=0 stack data _45 _46
+    5 TUPLE	//  _44
+  }>
+  test_example PROC:<{
+    //  exit_code data stack actions gas
+    2 1 BLKDROP2	//  exit_code data gas
+    s0 s2 XCHG	//  gas data exit_code
+    0 NEQINT	//  gas data _7
+    100 THROWIF
+    CTOS	//  gas ds
+    32 LDU	//  gas _26 _25
+    NIP	//  gas ds
+    32 LDU	//  gas _28 _27
+    DROP	//  gas _15
+    10 NEQINT	//  gas _19
+    101 THROWIF
+    1000000 PUSHINT	//  gas _22=1000000
+    GREATER	//  _23
+    102 THROWIF
+  }>
+}END>c

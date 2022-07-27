@@ -1,0 +1,97 @@
+int equal_slices (slice a, slice b) asm "SDEQ";
+
+(int, int, int, int, slice, int) load_data() {
+    slice ds = get_data().begin_parse();
+    return (ds~load_uint(32), ds~load_uint(32), ds~load_uint(32), ds~load_uint(32), ds~load_msg_addr(), ds~load_uint(256));
+}
+
+() store_data(int external_counter, int internal_counter, int owner_external_counter, int owner_internal_counter, slice owner_address, int public_key) impure {
+    set_data(
+        begin_cell()
+            .store_uint(external_counter, 32)
+            .store_uint(internal_counter, 32)
+            .store_uint(owner_external_counter, 32)
+            .store_uint(owner_internal_counter, 32)
+            .store_slice(owner_address)
+            .store_uint(public_key, 256)
+            .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+	throw_if(35, in_msg_body.slice_bits() < 32);
+    int n = in_msg_body~load_uint(32);
+
+    var (external_counter, internal_counter, owner_external_counter, owner_internal_counter, owner_address, public_key) = load_data();
+    internal_counter += n;
+    if (equal_slices(sender_address, owner_address)) {
+        owner_internal_counter += n;
+    }
+
+    store_data(external_counter, internal_counter, owner_external_counter, owner_internal_counter, owner_address, public_key);
+}
+
+() recv_external(slice in_msg) impure {
+    int is_owner = 0;  ;; 0 - false; -1 - true
+    int n = 0;
+    var (external_counter, internal_counter, owner_external_counter, owner_internal_counter, owner_address, public_key) = load_data();
+
+    if (in_msg.slice_bits() == 32) {
+        n = in_msg~load_uint(32);
+    } else {
+        throw_if(35, in_msg.slice_bits() < 512 + 32);
+        var signature = in_msg~load_bits(512);
+        n = in_msg~load_uint(32);
+        is_owner = check_signature(slice_hash(in_msg), signature, public_key);
+    }
+
+    accept_message();
+
+    external_counter += n;
+    if (is_owner) {
+        owner_external_counter += n;
+    }
+
+    store_data(external_counter, internal_counter, owner_external_counter, owner_internal_counter, owner_address, public_key);
+}
+
+;; Get methods
+(int, int, int, int, slice, int) get_all() method_id {
+    var cs = get_data().begin_parse();
+    return load_data();
+}
+
+int get_external_counter() method_id {
+    var cs = get_data().begin_parse();
+    return cs~load_uint(32);
+}
+
+int get_internal_counter() method_id {
+    var cs = get_data().begin_parse();
+    cs~load_uint(32);
+    return cs~load_uint(32);
+}
+
+int get_owner_external_counter() method_id {
+    var cs = get_data().begin_parse();
+    cs~load_uint(32);
+    cs~load_uint(32);
+    return cs~load_uint(32);
+}
+
+int get_owner_internal_counter() method_id {
+    var cs = get_data().begin_parse();
+    cs~load_uint(32);
+    cs~load_uint(32);
+    cs~load_uint(32);
+    return cs~load_uint(32);
+}

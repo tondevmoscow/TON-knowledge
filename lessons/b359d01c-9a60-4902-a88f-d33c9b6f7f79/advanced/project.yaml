@@ -1,0 +1,6 @@
+contract:
+  data: fift/init_data_cell_of_advanced_counter.fif
+  func:
+    - func/advanced_counter.fc
+  tests:
+    - tests/test.fc

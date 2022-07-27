@@ -1,0 +1,3 @@
+"./fift/init_data_cell_of_advanced_counter.fif" include
+2 boc+>B
+"./build/boc/init_data_cell.boc" tuck B>file

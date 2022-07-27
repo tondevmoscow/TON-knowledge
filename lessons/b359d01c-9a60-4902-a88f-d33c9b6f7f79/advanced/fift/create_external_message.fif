@@ -1,0 +1,17 @@
+#!/usr/bin/fift -s
+"TonUtil.fif" include
+"Asm.fif" include
+
+
+"./build/owner.pk" load-keypair
+constant owner_private_key
+constant owner_public_key
+
+"./build/advanced_counter.addr" load-address
+2dup 2constant advanced_counter_addr
+
+<b 1618 32 u, b>
+dup hashu owner_private_key ed25519_sign_uint
+<b b{1000100} s, advanced_counter_addr addr, 0 Gram, b{00} s, swap B, swap <s s, b>
+2 boc+>B
+"./build/boc/external_message.boc" tuck B>file

@@ -1,0 +1,158 @@
+"Asm.fif" include
+// automatically generated from `./func/lib/stdlib.fc` `./func/advanced_counter.fc` 
+PROGRAM{
+  DECLPROC load_data
+  DECLPROC store_data
+  DECLPROC recv_internal
+  DECLPROC recv_external
+  117796 DECLMETHOD get_all
+  70565 DECLMETHOD get_external_counter
+  72211 DECLMETHOD get_internal_counter
+  71875 DECLMETHOD get_owner_external_counter
+  70005 DECLMETHOD get_owner_internal_counter
+  load_data PROC:<{
+    // 
+    c4 PUSH	//  _1
+    CTOS	//  ds
+    32 LDU	//  _3 ds
+    32 LDU	//  _3 _6 ds
+    32 LDU	//  _3 _6 _9 ds
+    32 LDU	//  _3 _6 _9 _12 ds
+    LDMSGADDR	//  _3 _6 _9 _12 _15 ds
+    256 LDU	//  _3 _6 _9 _12 _15 _31 _30
+    DROP	//  _3 _6 _9 _12 _15 _17
+  }>
+  store_data PROC:<{
+    //  external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key
+    s0 s5 XCHG
+    NEWC	//  public_key internal_counter owner_external_counter owner_internal_counter owner_address external_counter _6
+    32 STU	//  public_key internal_counter owner_external_counter owner_internal_counter owner_address _8
+    s1 s4 XCHG	//  public_key owner_address owner_external_counter owner_internal_counter internal_counter _8
+    32 STU	//  public_key owner_address owner_external_counter owner_internal_counter _10
+    s1 s2 XCHG	//  public_key owner_address owner_internal_counter owner_external_counter _10
+    32 STU	//  public_key owner_address owner_internal_counter _12
+    32 STU	//  public_key owner_address _14
+    SWAP	//  public_key _14 owner_address
+    STSLICER	//  public_key _15
+    256 STU	//  _17
+    ENDC	//  _18
+    c4 POP
+  }>
+  recv_internal PROC:<{
+    //  my_balance msg_value in_msg_full in_msg_body
+    2 2 BLKDROP2	//  in_msg_full in_msg_body
+    DUP	//  in_msg_full in_msg_body in_msg_body
+    SEMPTY	//  in_msg_full in_msg_body _4
+    IFJMP:<{	//  in_msg_full in_msg_body
+      2DROP	// 
+    }>	//  in_msg_full in_msg_body
+    SWAP	//  in_msg_body in_msg_full
+    CTOS	//  in_msg_body cs
+    4 LDU	//  in_msg_body flags cs
+    SWAP
+    1 PUSHINT	//  in_msg_body cs flags _11=1
+    AND	//  in_msg_body cs _12
+    IFJMP:<{	//  in_msg_body cs
+      2DROP	// 
+    }>	//  in_msg_body cs
+    LDMSGADDR	//  in_msg_body _39 _38
+    DROP	//  in_msg_body sender_address
+    OVER	//  in_msg_body sender_address in_msg_body
+    SBITS	//  in_msg_body sender_address _17
+    32 LESSINT	//  in_msg_body sender_address _19
+    35 THROWIF
+    SWAP	//  sender_address in_msg_body
+    32 LDU	//  sender_address _41 _40
+    DROP	//  sender_address n
+    load_data CALLDICT	//  sender_address n external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key
+    s4 s6 XCPU	//  sender_address n external_counter public_key owner_external_counter owner_internal_counter owner_address internal_counter n
+    ADD	//  sender_address n external_counter public_key owner_external_counter owner_internal_counter owner_address internal_counter
+    s7 s1 XCPU	//  internal_counter n external_counter public_key owner_external_counter owner_internal_counter owner_address sender_address owner_address
+    SDEQ	//  internal_counter n external_counter public_key owner_external_counter owner_internal_counter owner_address _33
+    IF:<{	//  internal_counter n external_counter public_key owner_external_counter owner_internal_counter owner_address
+      s0 s5 XCHG	//  internal_counter owner_address external_counter public_key owner_external_counter owner_internal_counter n
+      ADD	//  internal_counter owner_address external_counter public_key owner_external_counter owner_internal_counter
+    }>ELSE<{
+      s5 POP	//  internal_counter owner_address external_counter public_key owner_external_counter owner_internal_counter
+    }>
+    2SWAP
+    s1 s5 XCHG
+    s1 s4 XCHG	//  external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key
+    store_data CALLDICT
+  }>
+  recv_external PROC:<{
+    //  in_msg
+    load_data CALLDICT	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key
+    s6 PUSH	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key in_msg
+    SBITS	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key _12
+    32 EQINT	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key _14
+    IF:<{	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key
+      s0 s6 XCHG	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address in_msg
+      32 LDU	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address _46 _45
+      DROP	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address n
+    }>ELSE<{	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key
+      s6 PUSH	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key in_msg
+      SBITS	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key _19
+      544 PUSHINT	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key _19 _22
+      LESS	//  in_msg external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key _23
+      35 THROWIF
+      s0 s6 XCHG
+      9 PUSHPOW2	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address in_msg _27=512
+      LDSLICEX	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address _48 _47
+      NIP	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address in_msg
+      32 LDU	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address _50 _49
+      DROP	//  public_key external_counter internal_counter owner_external_counter owner_internal_counter owner_address n
+    }>
+    ACCEPT
+    s1 s5 XCHG	//  public_key owner_address internal_counter owner_external_counter owner_internal_counter external_counter n
+    ADD	//  public_key owner_address internal_counter owner_external_counter owner_internal_counter external_counter
+    s0 s5 XCHG
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3	//  external_counter internal_counter owner_external_counter owner_internal_counter owner_address public_key
+    store_data CALLDICT
+  }>
+  get_all PROC:<{
+    // 
+    load_data CALLDICT	//  _4 _5 _6 _7 _8 _9
+  }>
+  get_external_counter PROC:<{
+    // 
+    c4 PUSH	//  _1
+    CTOS	//  cs
+    32 LDU	//  _7 _6
+    DROP	//  _3
+  }>
+  get_internal_counter PROC:<{
+    // 
+    c4 PUSH	//  _1
+    CTOS	//  cs
+    32 LDU	//  _10 _9
+    NIP	//  cs
+    32 LDU	//  _12 _11
+    DROP	//  _6
+  }>
+  get_owner_external_counter PROC:<{
+    // 
+    c4 PUSH	//  _1
+    CTOS	//  cs
+    32 LDU	//  _13 _12
+    NIP	//  cs
+    32 LDU	//  _15 _14
+    NIP	//  cs
+    32 LDU	//  _17 _16
+    DROP	//  _9
+  }>
+  get_owner_internal_counter PROC:<{
+    // 
+    c4 PUSH	//  _1
+    CTOS	//  cs
+    32 LDU	//  _16 _15
+    NIP	//  cs
+    32 LDU	//  _18 _17
+    NIP	//  cs
+    32 LDU	//  _20 _19
+    NIP	//  cs
+    32 LDU	//  _22 _21
+    DROP	//  _12
+  }>
+}END>c

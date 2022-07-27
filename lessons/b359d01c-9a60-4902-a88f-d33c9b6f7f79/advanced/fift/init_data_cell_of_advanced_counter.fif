@@ -1,0 +1,20 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+"./build/owner.pk" load-keypair // load owner key pair
+constant owner_private_key
+constant owner_public_key
+
+"./build/owner.addr" load-address // load owner address
+2dup 2constant owner_address
+."INFO: Owner wallet address = " 2dup 6 .Addr cr
+
+
+<b
+  0 32 u, // external_counter
+  0 32 u, // internal_counter
+  0 32 u, // owner_external_counter
+  0 32 u, // owner_internal_counter
+  owner_address addr,
+  owner_public_key B,
+b>

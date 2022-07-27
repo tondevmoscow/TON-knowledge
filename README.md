@@ -1,3 +1,2 @@
 # TON-knowledge
-
-A repository to store all articles and lessons of the t.me/tondevmoscow community.
+## Use our [wiki](https://github.com/tondevru/TON-knowledge/wiki) to navigate.
