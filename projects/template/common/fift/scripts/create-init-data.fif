@@ -1,0 +1,18 @@
+#!/usr/bin/fift -s
+"TonUtil.fif" include
+"Asm.fif" include
+"Color.fif" include
+
+{ ."usage: " $0 type ." input-fif-path output-boc-path " cr
+."Generate initial data .boc file from input .fif file" cr 1 halt } : usage
+
+$# 2 <> ' usage if
+
+2 :$1..n
+
+$1 constant input_fif_path
+$2 constant output_boc_path
+
+input_fif_path include
+2 boc+>B
+output_boc_path tuck B>file

@@ -1,0 +1,26 @@
+#!/usr/bin/fift -s
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " $0 type ." sender-pk-path contract-addr-path message-data-path output-boc" cr
+."Generate external message .boc" cr 1 halt } : usage
+$# 4 <> ' usage if
+4 :$1..n
+$1 constant sender_pk_path
+$2 constant contract_addr_path
+$3 constant message_data_path
+$4 constant output_boc
+
+
+sender_pk_path load-keypair
+constant deployer_private_key
+constant deployer_public_key
+
+contract_addr_path load-address
+2dup 2constant contract_addr
+
+message_data_path include
+dup hashu deployer_private_key ed25519_sign_uint
+<b b{1000100} s, contract_addr addr, 0 Gram, b{00} s, swap B, swap <s s, b>
+2 boc+>B
+output_boc tuck B>file
