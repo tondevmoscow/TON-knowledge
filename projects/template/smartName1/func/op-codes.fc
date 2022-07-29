@@ -1,1 +1,0 @@
-int op::mint() asm "21 PUSHINT";

@@ -1,8 +1,0 @@
-[int, tuple, cell, tuple, int] test_internal_message() method_id(0) {
-	return [function_selector, stack, data, get_c7(), null()];
-}
-
-
-_ test_example(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
-	throw_if(100, exit_code != 0);
-}
