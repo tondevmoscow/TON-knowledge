@@ -1,0 +1,3 @@
+[submodule "projects/template"]
+	path = projects/template
+	url = git@github.com:tondevru/TON-project-template.git
