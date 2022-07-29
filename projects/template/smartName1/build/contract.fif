@@ -1,5 +1,5 @@
 "Asm.fif" include
-// automatically generated from `/Users/akkireev/Library/Application Support/toncli/func-libs/stdlib-tests.func` `/Users/akkireev/Documents/blockchain/tondev/tondevru/TON-knowledge/projects/template/smartName1/func/contract.fc` 
+// automatically generated from `../common/func/lib/stdlib.fc` `./func/op-codes.fc` `./func/contract.fc` 
 PROGRAM{
   DECLPROC recv_internal
   DECLPROC recv_external

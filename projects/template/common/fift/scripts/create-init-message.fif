@@ -1,10 +1,10 @@
-#!/usr/bin/fift -s
+#!fift -s
 "TonUtil.fif" include
 "Asm.fif" include
 "Color.fif" include
 
-{ ."usage: " $0 type ." compiled-code-fif-path init-data-fif-path workchain output-boc-path output-addr-path output-human-readable-address-path" cr
-."Generate init message and calculate contract address" cr 1 halt } : usage
+{ ."usage: " $0 type ." <compiled-code-fif-path> <init-data-fif-path> <workchain> <output-boc-path> <output-addr-path> <output-human-readable-address-path>" cr
+."Generates init message and calculates contract address" cr 1 halt } : usage
 $# 6 <> ' usage if
 6 :$1..n
 $1 constant code_path

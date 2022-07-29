@@ -6,7 +6,7 @@ sccompile:
 
 scdatacompile:
 	fift -I ../common/fift/lib \
-		 -s ../common/fift/scripts/create-init-data.fif \
+		 -s ../common/fift/scripts/fift-to-boc.fif \
 		 ./fift/initial-data.fif ./build/boc/initial-data.boc
 
 scinitcompile:
@@ -15,30 +15,41 @@ scinitcompile:
 		 ./build/contract.fif ./fift/initial-data.fif 0 ./build/boc/init-contract-message.boc ./build/contract.addr ./build/contract-address.txt
 
 scinitsend:
-	lite-client -v 3 --timeout 3 -C ./testnet.json -v 2 \
-				-c 'sendfile ./build/boc/init_contract_message.boc'
+	lite-client -v 3 --timeout 3 -C ../testnet.json -v 2 \
+				-c 'sendfile ./build/boc/init-contract-message.boc'
 
-scproccess: sccompile scdatacompile scinitcompile scinitsend
+scprocess: sccompile scinitcompile scinitsend
 
 sctest:
 	toncli run_tests
 
 
 # INTERNAL MESSAGE (IM)
+imdatacompile:
+	fift -I ../common/fift/lib \
+		 -s ../common/fift/scripts/fift-to-boc.fif \
+		 ./fift/internal-message-body.fif ./build/boc/internal-message-body.boc
+
 imcompile:
 	fift -I ../common/fift/lib \
-		 -L ../common/fift/scripts/cli.fif \
 		 -s ../common/fift/scripts/create-internal-message.fif \
-		 build/contract kQA3esZyDjmwHo6eewGLoDjm4kYpc9mFNI_tVYDje101-_nG 698983191 4 0.1 \
+		 ../common/deployer.pk ../common/deployer.addr 698983191 1 \
+		 kQD6mVG1gaybJWJOb8KoSHTvYQSGlKBZ-Q-8c-KsWsJSdyuU 0.3 \
+		 ./build/boc/internal-message.boc \
 		 -B ./fift/internal-message-body.fif
 
 imsend:
-	lite-client -v 3 --timeout 3 -C ../testnet.json -v 2 -c 'sendfile ./build/boc/internal_message.boc'
+	lite-client -v 3 --timeout 3 -C ../testnet.json -v 2 -c 'sendfile ./build/boc/internal-message.boc'
 
 improcess: imcompile imsend
 
 
 # EXTERNAL MESSAGE (EM)
+emdatacompile:
+	fift -I ../common/fift/lib \
+		 -s ../common/fift/scripts/fift-to-boc.fif \
+		 ./fift/external-message-body.fif ./build/boc/external-message-body.boc
+
 emcompile:
 	fift -I ../common/fift/lib \
 		 -s ../common/fift/scripts/create-external-message.fif \
@@ -47,9 +58,9 @@ emcompile:
 emsend:
 	lite-client -v 3 --timeout 3 -C ../testnet.json -v 2 -c 'sendfile ./build/boc/external-message.boc'
 
-extmsgprocess: emcompile emsend
+emprocess: emcompile emsend
 
 
-# GET METHODS
-get-seqno:
+# GET METHODS (G)
+gseqno:
 	toncli get seqno

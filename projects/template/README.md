@@ -26,6 +26,24 @@ To get your wallet .addr and .pk use the following command:
 wton wallet W_NAME to-addr-pk ./common/
 ```
 
+# Structure usage example
+
+To print .fif script usage run it without args:
+```code
+./common/fift/scripts/create-init-data.fif
+```
+
+To work with contract and messages use Makefile:
+```code
+make sccompile
+make scinitcompile
+make scinitsend
+
+OR
+
+make scprocess
+```
+
 ## Folders
 ```
 template
