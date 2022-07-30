@@ -2,7 +2,7 @@
 
 # Введение
 
-[Видео обсуждение урока.](https://www.youtube.com/watch?v=PNMpYmOkB8Q)
+[Видео обсуждение урока.](https://youtu.be/PNMpYmOkB8Q)
 
 Будем писать смарт контракт для TON.
 
