@@ -1,2 +1,2 @@
 # TON-knowledge
-## Use our [wiki](https://github.com/tondevru/TON-knowledge/wiki) to navigate.
+### The community of people who believe in TON.
