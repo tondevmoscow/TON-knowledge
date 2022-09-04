@@ -1,0 +1,41 @@
+;; Root DNS resolver in masterchain
+
+slice load_data() inline {
+    return get_data().begin_parse(); ;; address of ".ton" dns resolver smart contract in basechain
+}
+
+;; "ton\0mysite\0subdomain\0", ANY => (24, DNSRecord(dns_next_resolver))
+;; ton\0mysite\0subdomain\0 => \0mysite\0subdomain\0 + следующий addr
+(int, cell) dnsresolve(slice subdomain, int category) method_id {
+    throw_unless(70, mod(slice_bits(subdomain), 8) == 0); ;; проверяем, что subdomain utf-8 строка
+
+    int starts_with_zero_byte = subdomain.preload_int(8) == 0; ;; \0ton... или ton...
+
+    if (starts_with_zero_byte & (slice_bits(subdomain) == 8)) { ;; был запрос на разрешение домена "."
+        return (8, null()); ;; записей не нашли
+    }
+    if (starts_with_zero_byte) {
+        subdomain~load_uint(8); ;; пропускаем \0, если он был перед ton (\0ton)
+    }
+
+    int top_subdomain_bits = get_top_domain_bits(subdomain); ;; ищем количество битов верхнего домена (ton в данном случае)
+    slice top_subdomain = subdomain~load_bits(top_subdomain_bits); ;; достаем его из subdomain
+
+    slice my_domain = "ton";
+    int my_domain_bits = slice_bits(my_domain); ;; количество битов в "ton", могли бы и top_subdomain_bits юзать?
+
+    if (~ equal_slices(top_subdomain, my_domain)) { ;; проверяем, что запрашиваемый домен начинается с "ton"
+        return (0, null()); ;; domain cannot be resolved
+    }
+
+    cell result = begin_cell()
+            .store_uint(dns_next_resolver_prefix, 16) ;; кладем префикс, как в tl-b схеме для dns_next_resolver (#ba93)
+            .store_slice(load_data()) ;; достаем адрес этого самого резолвера (на том конце nft minter dns доменов)
+            .end_cell();
+
+    return (my_domain_bits + (starts_with_zero_byte ? 8 : 0), result); ;; возвращаем 24 + 8 (в случае \0ton...) либо 0 и DNSRecord.
+    ;; Тут в DNSRecord лежит адрес nft-collection.fc, который отвечает за nft-item
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+}
