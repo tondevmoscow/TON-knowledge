@@ -1,0 +1,48 @@
+{-
+storage#_ seqno:uint32 public_key:uint256 = Storage;
+
+seqno - инкрементируемое значение, использующееся для избежания повторных отправлений одной и той же транзакции дважды
+public_key - публичный ключ для проверки подписи
+-}
+
+() recv_internal(slice in_msg) impure {
+    ;; ничего не делаем для внутренних сообщений.
+    ;; благодаря тому, что мы объявили этот метод, наш кошелек может получать деньги от других смарт-контрактов
+}
+
+() recv_external(slice in_msg) impure {
+    var signature = in_msg~load_bits(512); ;; считываем подпись из сообщения, которое пришло
+    var cs = in_msg;
+    var (msg_seqno, valid_until) = (cs~load_uint(32), cs~load_uint(32)); ;; считываем seqno и valid_until
+    throw_if(35, valid_until <= now()); ;; проверяем, что срок действия запроса на перевод не истек
+    var ds = get_data().begin_parse();
+    var (stored_seqno, public_key) = (ds~load_uint(32), ds~load_uint(256)); ;; считываем seqno и public_key из c4
+    ds.end_parse();
+    throw_unless(33, msg_seqno == stored_seqno); ;; выбрасываем исключение, если seqno в хранилище не равно seqno в запросе
+    throw_unless(34, check_signature(slice_hash(in_msg), signature, public_key)); ;; проверяем подпись сообщения, используя in_msg без 512 бит (мы их прочитали)
+    accept_message(); ;; принимаем сообщение. Без этого сообщение не будет обработано, так как за него некому заплатить.
+    ;; ^ Данный метод устанавливает доступное значение газа на размер всего баланса смарт-контракта. Нужно быть осторожнее.
+
+    cs~touch();
+    while (cs.slice_refs()) { ;; можно отправить 4 сообщения в одном external запросе
+        var mode = cs~load_uint(8); ;; причем с разными mode
+        send_raw_message(cs~load_ref(), mode);  ;; разбор в конце README mode ов
+    }
+    cs.end_parse();
+    set_data(begin_cell()
+            .store_uint(stored_seqno + 1, 32) ;; увеличиваем на 1 seqno, чтобы текущее сообщение не могло быть испольлзовано дважды
+            .store_uint(public_key, 256)
+            .end_cell());
+}
+
+;; Get methods
+
+int seqno() method_id {
+    return get_data().begin_parse().preload_uint(32); ;; возвращаем seqno, это используется в кошельках, чтобы отсылать верное seqno
+}
+
+int get_public_key() method_id {
+    var cs = get_data().begin_parse();
+    cs~load_uint(32);
+    return cs.preload_uint(256); ;; возвращаем public_key
+}

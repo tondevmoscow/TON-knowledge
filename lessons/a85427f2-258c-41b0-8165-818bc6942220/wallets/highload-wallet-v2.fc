@@ -1,0 +1,78 @@
+{-
+Данная версия не использует seqno для защиты от повторных транзакций.
+Вместо этого, она запоминает query_ids предыдущих транзакций, поэтому несколько сообщений с разными query_id
+могут быть отправленны одновременно
+
+В storage добавляется
+old_queries - словарь со значениями query_id, которые мы успешно отправили
+last_cleaned - время, когда мы последний раз отчищали old_queries
+
+И удаляется seqno
+-}
+
+() recv_internal(slice in_msg) impure {
+    ;; do nothing for internal messages
+}
+
+() recv_external(slice in_msg) impure {
+    var signature = in_msg~load_bits(512);
+    var cs = in_msg;
+    var (subwallet_id, query_id) = (cs~load_uint(32), cs~load_uint(64));
+    var bound = (now() << 32);
+    throw_if(35, query_id < bound); ;; проверяем, что query_id использует время и включает в себя valid_until
+    var ds = get_data().begin_parse();
+    var (stored_subwallet, last_cleaned, public_key, old_queries) = (ds~load_uint(32), ds~load_uint(64), ds~load_uint(256), ds~load_dict());
+    ds.end_parse();
+    (_, var found?) = old_queries.udict_get?(64, query_id);
+    throw_if(32, found?);
+    throw_unless(34, subwallet_id == stored_subwallet);
+    throw_unless(35, check_signature(slice_hash(in_msg), signature, public_key));
+    var dict = cs~load_dict();
+    cs.end_parse();
+    accept_message();
+    int i = -1;
+    do {
+        (i, var cs, var f) = dict.idict_get_next?(16, i);
+        if (f) {
+            var mode = cs~load_uint(8);
+            send_raw_message(cs~load_ref(), mode);
+        }
+    } until (~ f);
+    bound -= (64 << 32); ;; будем чистить записи отправленные более 64 секунд назад
+    old_queries~udict_set_builder(64, query_id, begin_cell());
+    var queries = old_queries; ;; зачем? нигде не используется
+    do {
+        var (old_queries', i, _, f) = old_queries.udict_delete_get_min(64); ;; считываем в новый словарь
+        f~touch();
+        if (f) {
+            f = (i < bound); ;; если значения клюач меньше bound, то есть раньше чем 64 секунды назад
+        }
+        if (f) { ;; то удаляем, поменяв переменную словаря
+            old_queries = old_queries';
+            last_cleaned = i; ;; обновляем значение последней чистки
+        }
+    } until (~ f);
+    set_data(begin_cell()
+            .store_uint(stored_subwallet, 32)
+            .store_uint(last_cleaned, 64)
+            .store_uint(public_key, 256)
+            .store_dict(old_queries)
+            .end_cell());
+}
+
+;; Get methods
+
+;; возвращает -1 для обработанных транзакций, 0 для необработанных, 1 для неизвестных (забытых/удаленных)
+int processed?(int query_id) method_id {
+    var ds = get_data().begin_parse();
+    var (_, last_cleaned, _, old_queries) = (ds~load_uint(32), ds~load_uint(64), ds~load_uint(256), ds~load_dict());
+    ds.end_parse();
+    (_, var found) = old_queries.udict_get?(64, query_id);
+    return found ? true : - (query_id <= last_cleaned);
+}
+
+int get_public_key() method_id {
+    var cs = get_data().begin_parse();
+    cs~load_uint(32 + 64);
+    return cs.preload_uint(256);
+}
