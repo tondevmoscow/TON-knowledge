@@ -156,7 +156,7 @@ int gas_to_coins(int workchain, int gas) inline_ref {
   }
   ;; далее мы знаем, что транзакция была отправлена wallet (подписчиком)
   if (in_msg.slice_bits() < 32) {
-    ;; просто пришел пинг от любого смарта на снятие средст и отправку их на смарт предоставляющий услугу
+    ;; просто пришел пинг на снятие средст и отправку их на смарт предоставляющий услугу
     return forward_funds(beneficiary, false, op:fallback());
   }
   int op = in_msg~load_uint(32);
