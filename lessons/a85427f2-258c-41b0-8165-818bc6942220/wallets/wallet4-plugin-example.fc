@@ -16,6 +16,8 @@ int short_msg_fwd_fee(int workchain) inline {
   ;;   ihr_price_factor:uint32 first_frac:uint16 next_frac:uint16 = MsgForwardPrices;
   ;;
   ;; config_fwd_prices#_ MsgForwardPrices = ConfigParam 25;
+  ;; "Lump_price это базовая комса сообщения. Все остальнве компоненты (плата за биты, за ячейки итп) плюсуется к ней."
+  ;; "чтобы было понятнее. Эта комса за root cell (потому что остальной forward fee считается без root cell)"
   int config_index = 25 + workchain;
   int lump_price = config_param(config_index).begin_parse().skip_bits(8).preload_uint(64);
   return lump_price;

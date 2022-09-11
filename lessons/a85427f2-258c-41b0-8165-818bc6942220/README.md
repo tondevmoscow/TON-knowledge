@@ -32,11 +32,11 @@
 ### Какой метод предпочтительнее для смарт-контракта?
 
 Конечно, для смарт-контракта более удобным является метод recv_internal,
-через который на смарт-контракт поступает не только сообщений, но и TON coin'ы для его обработки.
+через который на смарт-контракт поступает не только сообщение, но и TON coin'ы для его обработки.
 
-В случае обработки recv_external, можно успешно устроить DDoS на смарт-контракт и лишить его баланса.
+В случае обработки recv_external для всех пользователей, можно быстро лишить смарт-контракт баланса.
 
-Встает вопрос, **как же сделать так, чтобы обычные пользователи могли общаться с другими
+Встает вопрос, **как же сделать так, чтобы обычные пользователи могли общаться со
 смарт-контрактами?**
 
 ## Кошельки
@@ -47,8 +47,7 @@
 внешние сообщения методом recv_external и отсылать их дальше internal сообщением!
 Так как он является смарт-контрактом, ему доступна такая возможность.
 
-Но в таком случае любой пользователь сможет пользоваться данным смарт-контрактом и отсылать деньги через
-него.
+Но в таком случае любой пользователь сможет пользоваться данным смарт-контрактом и тратить его баланс.
 Как же быть? Как сделать так, чтобы только владелец смарт-контракта мог отправлять сообщения через него?
 Ответ - криптография.
 Для подписи сообщений в TON используется алгоритм Ed25519
@@ -58,7 +57,7 @@
 
 Что мы имеем на выходе? У нас есть смарт-контракт, принимающий внешние (external) сообщения,
 проверяет подпись публичным ключом, который лежит в его хранилище, и отправляет уже внутренние (internal)
-сообщения дальше по указанному адресу. **Данный интерфейс и будет называться кошельком (wallet) в сети
+сообщения дальше по указанному адресу. **Данный интерфейс и называется кошельком (wallet) в сети
 TON**
 
 ## Пример подписи на языке fift
@@ -100,21 +99,6 @@ dup hashu wallet_pk ed25519_sign_uint
 6. highload-wallet-v2.fc
 
 ## Mode отправки сообщения
-Sends a raw message contained in msg, which should contain a correctly serialized object Message X, 
-with the only exception that the source address is allowed to have dummy value addr_none 
-(to be automatically replaced with the current smart contract address), 
-and ihr_fee, fwd_fee, created_lt and created_at fields can have arbitrary values 
-(to be rewritten with correct values during the action phase of the current transaction).
-Integer parameter mode contains the flags. Currently mode = 0 is used for ordinary messages; 
-mode = 128 is used for messages that are to carry all the remaining balance of the current smart contract 
-(instead of the value originally indicated in the message); mode = 64 is used for messages that carry 
-all the remaining value of the inbound message in addition to the value initially indicated in the new 
-message (if bit 0 is not set, the gas fees are deducted from this amount); mode' = mode + 1 means that 
-the sender wants to pay transfer fees separately; mode' = mode + 2 means that any errors arising while 
-processing this message during the action phase should be ignored. Finally, mode' = mode + 32 means that 
-the current account must be destroyed if its resulting balance is zero. This flag is usually employed 
-together with +128.
-
 
 0 - обычное сообщение
 
