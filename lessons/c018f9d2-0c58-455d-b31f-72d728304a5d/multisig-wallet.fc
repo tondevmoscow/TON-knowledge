@@ -1,0 +1,366 @@
+;; Кошелек с множественной подписью
+
+_ unpack_state() inline_ref {
+  ;; получаем данные из storage
+  var ds = begin_parse(get_data());
+  var res = (ds~load_uint(32), ds~load_uint(8), ds~load_uint(8), ds~load_uint(64), ds~load_dict(), ds~load_dict());
+  ds.end_parse();
+  return res;
+}
+
+_ pack_state(cell pending_queries, cell owner_infos, int last_cleaned, int k, int n, int wallet_id) inline_ref {
+  ;; упаковываем данные:
+  ;; pending_queries - словарь, ключ - query_id, значение - query
+  ;; owner_infos - словарь, ключ - used_id (число от 0 до 256), значение - owner_info
+  ;; last_cleaned - timestamp последнего очищенного запроса
+  ;; n - общее кол-во участников multisig кошелька
+  ;; k - необходимое кол-во подписей для подтверждения отправки запроса
+  ;; wallet_id - как и в прошлых версиях, для созданиях разных кошельков с одинаковыми ключами
+  return begin_cell()
+    .store_uint(wallet_id, 32)
+    .store_uint(n, 8)
+    .store_uint(k, 8)
+    .store_uint(last_cleaned, 64)
+    .store_dict(owner_infos)
+    .store_dict(pending_queries)
+  .end_cell();
+}
+
+_ pack_owner_info(int public_key, int flood) inline_ref {
+  ;; упаковываем информацию отдельного владельца:
+  ;; public_key владельца
+  ;; flood - кол-во флуд сообщений (макс можно отправить 10 на ожидание)
+  return begin_cell()
+    .store_uint(public_key, 256)
+    .store_uint(flood, 8);
+}
+
+_ unpack_owner_info(slice cs) inline_ref {
+  ;; распаковываем информацию отдельного владельца
+  return (cs~load_uint(256), cs~load_uint(8));
+}
+
+(int, int) check_signatures(cell public_keys, cell signatures, int hash, int cnt_bits) inline_ref {
+  int cnt = 0;
+
+  do {
+    slice cs = signatures.begin_parse();
+    slice signature = cs~load_bits(512);
+
+    int i = cs~load_uint(8);
+    signatures = cs~load_dict(); ;; считываем следующую подпись или null
+
+    (slice public_key, var found?) = public_keys.udict_get?(8, i); ;; считываем owner_info по id
+    throw_unless(37, found?);
+    throw_unless(38, check_signature(hash, signature, public_key.preload_uint(256)));
+
+    int mask = (1 << i); ;; будем помечать, что пользователь i одобрил
+    int old_cnt_bits = cnt_bits;
+    cnt_bits |= mask; ;; обновляем маску
+    ;; проверяем, обновилась ли маска (один и тот же пользователь не повлияет на cnt дважды, а root уже в cnt_bits изначально)
+    int should_check = cnt_bits != old_cnt_bits;
+    cnt -= should_check; ;; обновляем cnt, только если cnt_bits != old_cnt_bits => -1 (true)
+  } until (cell_null?(signatures));
+
+  return (cnt, cnt_bits);
+}
+
+(int, int, int, slice) unpack_query_data(slice in_msg, int n, slice query, var found?, int root_i) inline_ref {
+  ;; распаковываем данные запроса
+  if (found?) {  ;; проверяем, что запрос был найден
+    throw_unless(35, query~load_int(1)); ;; проверяем, что запрос еще не был обработан. 0 => обработан
+    ;; выгружаем данные запроса:
+    ;; creator_i - кто создавал запрос
+    ;; cnt - сколько уже подтвердили
+    ;; cnt_bits - "список" тех, кто подтвердил
+    ;; msg - само сообщение
+    (int creator_i, int cnt, int cnt_bits, slice msg) = (query~load_uint(8), query~load_uint(8), query~load_uint(n), query);
+    throw_unless(36, slice_hash(msg) == slice_hash(in_msg)); ;; проверяем, что сообщения совпадают
+    return (creator_i, cnt, cnt_bits, msg); ;; возвращаем данные найденного создателя этого запроса
+  }
+  return (root_i, 0, 0, in_msg); ;; новый запрос, значит creator == root, подтверждено 0 человек на текущий момент
+}
+
+(cell, ()) dec_flood(cell owner_infos, int creator_i) {
+  ;; просто уменьшаем flood пользователя на 1
+  ;; будет вызвано в случае успешной отправки query
+  ;; или по истечению срока его отправки
+  (slice owner_info, var found?) = owner_infos.udict_get?(8, creator_i);
+  (int public_key, int flood) = unpack_owner_info(owner_info);
+  owner_infos~udict_set_builder(8, creator_i, pack_owner_info(public_key, flood - 1));
+  return (owner_infos, ());
+}
+
+() try_init() impure inline_ref {
+  ;; первый запрос без сигнатуры всегда принимается
+  (int wallet_id, int n, int k, int last_cleaned, cell owner_infos, cell pending_queries) = unpack_state();
+  throw_if(37, last_cleaned);  ;; проверяем, что еще не было запросов
+  accept_message();
+  set_data(pack_state(pending_queries, owner_infos, 1, k, n, wallet_id)); ;; устанавливаем timestamp в 1
+}
+
+(cell, cell) update_pending_queries(cell pending_queries, cell owner_infos, slice msg, int query_id, int creator_i, int cnt, int cnt_bits, int n, int k) impure inline_ref {
+  if (cnt >= k) { ;; если достигли нужного кол-ва подписей
+    accept_message();
+    while (msg.slice_refs()) { ;; совершаем отправку, как и в обычном кошельке
+      var mode = msg~load_uint(8);
+      send_raw_message(msg~load_ref(), mode);
+    }
+    ;; говорим, что запрос отработан (pending? нет => false => 0)
+    pending_queries~udict_set_builder(64, query_id, begin_cell().store_int(0, 1));
+    owner_infos~dec_flood(creator_i); ;; уменьшаем flood владельца запроса на 1
+  } else { ;; иначе обновляем информацию по данному
+    pending_queries~udict_set_builder(64, query_id, begin_cell()
+      .store_uint(1, 1)
+      .store_uint(creator_i, 8)
+      .store_uint(cnt, 8)
+      .store_uint(cnt_bits, n)
+      .store_slice(msg));
+  }
+  return (pending_queries, owner_infos);
+}
+
+(int, int) calc_boc_size(int cells, int bits, slice root) {
+  ;; рекурсивно считаем кол-во cells и bits в первоначальном root
+  ;; другой подход: compute_data_size, который вызывает CDATASIZE
+  cells += 1;
+  bits += root.slice_bits();
+
+  while (root.slice_refs()) {
+    (cells, bits) = calc_boc_size(cells, bits, root~load_ref().begin_parse());
+  }
+
+  return (cells, bits);
+}
+
+() recv_internal(slice in_msg) impure {
+  ;; принимаем любое сообщение и сохраняем деньги на балансе
+}
+
+() recv_external(slice in_msg) impure {
+  ;; пустые сообщения запускают инициализацию (меняет last_cleaned с 0 на 1 или throw)
+  if (slice_empty?(in_msg)) {
+    return try_init();
+  }
+
+  ;; хотим проверить, что сообщение изначально подписано ключом root
+  slice root_signature = in_msg~load_bits(512);
+  int root_hash = slice_hash(in_msg);
+  int root_i = in_msg~load_uint(8);
+
+  (int wallet_id, int n, int k, int last_cleaned, cell owner_infos, cell pending_queries) = unpack_state();
+  last_cleaned -= last_cleaned == 0; ;; меняет с 0 до 1 или оставляет старое значение
+
+  ;; достаем информацию о root пользователе и проверяем, что им было подписано в конце ВСЕ сообщение, 
+  ;; включая signatures других пользователей
+  (slice owner_info, var found?) = owner_infos.udict_get?(8, root_i); 
+  throw_unless(31, found?);
+  (int public_key, int flood) = unpack_owner_info(owner_info);
+  throw_unless(32, check_signature(root_hash, root_signature, public_key));
+
+  ;; считываем Maybe ^Y из сообщения (подписи лежат в формате: sig:uint512 i:uint8 next_sig:Maybe ^X)
+  cell signatures = in_msg~load_dict();
+
+  ;; хотим проверить, что всеми остальными подписями был подписан именно этот payload
+  var hash = slice_hash(in_msg);
+  int query_wallet_id = in_msg~load_uint(32);
+  throw_unless(42, query_wallet_id == wallet_id);
+
+  int query_id = in_msg~load_uint(64);
+
+  (int cnt, int bits) = calc_boc_size(0, 0, in_msg);
+  throw_if(40, (cnt > 8) | (bits > 2048)); ;; выбрасываем исключение, если в сообщении больше 8 ячеек или 2048 битов
+
+  ;; достаем из словаря запросов, которые ожидают подтверждения
+  (slice query, var found?) = pending_queries.udict_get?(64, query_id);
+
+  ifnot (found?) {
+    ;; если запрос новый, будем обновлять счетчик флуда для конкретного пользователя
+    flood += 1;
+    throw_if(39, flood > 10);
+  }
+
+  var bound = (now() << 32); ;; так как query_id по стандарту 64 бита, а timestamp - 32
+  throw_if(33, query_id < bound); ;; выходим, если время для запроса истекло
+
+  ;; получается, тут creator_i либо root, если это новый запрос, либо creator_i старый
+  (int creator_i, int cnt, int cnt_bits, slice msg) = unpack_query_data(in_msg, n, query, found?, root_i);
+  int mask = 1 << root_i; ;; получаем из 1 -> 10000, где кол-во нулей == root_i (индекс/ключ вызвавшего) 
+  throw_if(34, cnt_bits & mask); ;; проверяем, что этим пользователем еще не одобрялся этот запрос
+  cnt_bits |= mask; ;; добавляем в cnt_bits mask, то есть "записываем", что пользователь i "одобрил"
+  cnt += 1; ;; количество одобренных увеличиваем на 1
+
+  ;; выбрасываем исключение, если deadline созданного query больше, чем 1 час и он не выполняется моментально (cnt < k)
+  throw_if(41, ~ found? & (cnt < k) & (bound + ((60 * 60) << 32) > query_id)); 
+
+  ;; вместо accept_message используем set_gas_limit, чтобы не потратить весь баланс на обработку singatures
+  ;; так как юзер может по ошибке или специально отправить огромный список signatures (например, дублировав свою подпись)
+  set_gas_limit(100000);
+
+  ifnot (found?) {
+    ;; обновляем flood пользователя при необходимости
+    owner_infos~udict_set_builder(8, root_i, pack_owner_info(public_key, flood));
+  }
+
+  ;; обновляем информацию и отправляем сообщения, если достигли k подтверждений
+  (pending_queries, owner_infos) = update_pending_queries(pending_queries, owner_infos, msg, query_id, creator_i, cnt, cnt_bits, n, k);
+  set_data(pack_state(pending_queries, owner_infos, last_cleaned, k, n, wallet_id));
+
+  commit();
+
+  int need_save = 0;
+  ;; если пользователь отправил в своем сообщении подписи других участников, собрав off-chain
+  ;; и сообщение еще не было отправлено
+  ifnot (cell_null?(signatures) | (cnt >= k)) {
+    (int new_cnt, cnt_bits) = check_signatures(owner_infos, signatures, hash, cnt_bits);
+    cnt += new_cnt; ;; добавляем к уже подсчитанным cnt те, что пришли в подписях
+    (pending_queries, owner_infos) = update_pending_queries(pending_queries, owner_infos, msg, query_id, creator_i, cnt, cnt_bits, n, k);
+    need_save = -1;
+  }
+
+  accept_message();
+  bound -= (64 << 32);  ;; будем очищать записи, которые стали просроченными более 64 секунд назад
+  int old_last_cleaned = last_cleaned;
+  do {
+    var (pending_queries', i, query, f) = pending_queries.udict_delete_get_min(64);
+    f~touch(); ;; переносим наверх в стаке
+    if (f) { ;; если запись есть
+      f = (i < bound); ;; просрочен ли запрос
+    }
+    if (f) { ;; если просрочен
+      if (query~load_int(1)) { ;; если еще не был одобрен, уменьшаем flood пользователя создателя
+        owner_infos~dec_flood(query~load_uint(8));
+      }
+      pending_queries = pending_queries'; ;; обновляем pending_queries (очищаем)
+      last_cleaned = i; ;; query_id последнего очищенного
+      need_save = -1;
+    }
+  } until (~ f);
+
+  if (need_save) {
+    set_data(pack_state(pending_queries, owner_infos, last_cleaned, k, n, wallet_id));
+  }
+}
+
+;; Get methods
+;; возвращает -1 для законченных запросов, 0 для незаконченных, 1 для неизвестных (забытых)
+(int, int) get_query_state(int query_id) method_id {
+  (_, int n, _, int last_cleaned, _, cell pending_queries) = unpack_state();
+  (slice cs, var found) = pending_queries.udict_get?(64, query_id);
+  if (found) {
+    if (cs~load_int(1)) {
+      cs~load_uint(8 + 8);
+      return (0, cs~load_uint(n)); ;; 0 и cnt_bits ("список" тех, кто подтвердил)
+    } else {
+      return (-1, 0);
+    }
+  }  else {
+    ;; странно, но вернет 0, если query_id > last_cleaned,
+    ;; по второму нулю можно понять, что query_id неверный
+    ;; так как, если первый 0, то второе значение > 0, т.к. хотя бы 1 подтвердил
+    return (-(query_id <= last_cleaned), 0); ;; будет 1 если query_id <= last_cleaned, то есть уже почистили
+  }
+}
+
+int processed?(int query_id) method_id {
+  (int x, _) = get_query_state(query_id);
+  return x;
+}
+
+cell create_init_state(int wallet_id, int n, int k, cell owners_info) method_id {
+  return pack_state(new_dict(), owners_info, 0, k, n, wallet_id);
+}
+
+cell merge_list(cell a, cell b) {
+  if (cell_null?(a)) {
+    return b;
+  }
+  if (cell_null?(b)) {
+    return a;
+  }
+  slice as = a.begin_parse();
+  if (as.slice_refs() != 0) {
+    cell tail = merge_list(as~load_ref(), b);
+    return begin_cell().store_slice(as).store_ref(tail).end_cell();
+  }
+
+  as~skip_last_bits(1);
+  ;; as~skip_bits(1);
+  return begin_cell().store_slice(as).store_dict(b).end_cell();
+
+}
+
+cell get_public_keys() method_id {
+  (_, _, _, _, cell public_keys, _) = unpack_state();
+  return public_keys;
+}
+
+;; для проверки, что запрос с подписями (или без) будет валиден
+(int, int) check_query_signatures(cell query) method_id {
+  slice cs = query.begin_parse();
+  slice root_signature = cs~load_bits(512);
+  int root_hash = slice_hash(cs);
+  int root_i = cs~load_uint(8);
+
+  cell public_keys = get_public_keys();
+  (slice public_key, var found?) = public_keys.udict_get?(8, root_i);
+  throw_unless(31, found?);
+  throw_unless(32, check_signature(root_hash, root_signature, public_key.preload_uint(256)));
+
+  int mask = 1 << root_i;
+
+  cell signatures = cs~load_dict();
+  if (cell_null?(signatures)) {
+    return (1, mask);
+  }
+  (int cnt, mask) = check_signatures(public_keys, signatures, slice_hash(cs), mask);
+  return (cnt + 1, mask);
+}
+
+;; возвращает список незаконченных запросов по mask'е (в mask содержится "список" проголосовавших, может быть 1 человек)
+cell messages_by_mask(int mask) method_id {
+  (_, int n, _, _, _, cell pending_queries) = unpack_state();
+  int i = -1;
+  cell a = new_dict();
+  do {
+    (i, var cs, var f) = pending_queries.udict_get_next?(64, i);
+    if (f) {
+      if (cs~load_int(1)) {
+        int cnt_bits = cs.skip_bits(8 + 8).preload_uint(n);
+        if (cnt_bits & mask) {
+          a~udict_set_builder(64, i, begin_cell().store_slice(cs));
+        }
+      }
+    }
+  } until (~ f);
+  return a;
+}
+
+;; для конкретного пользователя
+cell get_messages_unsigned_by_id(int id) method_id {
+  return messages_by_mask(1 << id);
+}
+
+;; достаем все незавершенные
+cell get_messages_unsigned() method_id {
+  return messages_by_mask(~ 0);
+}
+
+;; кол-во участников multisig и мин кол-во для завершения запроса
+(int, int) get_n_k() method_id {
+  (_, int n, int k, _, _, _) = unpack_state();
+  return (n, k);
+}
+
+;; смержить запросы из a и b в один
+cell merge_inner_queries(cell a, cell b) method_id {
+  slice ca = a.begin_parse();
+  slice cb = b.begin_parse();
+  cell list_a = ca~load_dict();
+  cell list_b = cb~load_dict();
+  throw_unless(31, slice_hash(ca) == slice_hash(cb));
+  return begin_cell()
+    .store_dict(merge_list(list_a, list_b))
+    .store_slice(ca)
+  .end_cell();
+}
