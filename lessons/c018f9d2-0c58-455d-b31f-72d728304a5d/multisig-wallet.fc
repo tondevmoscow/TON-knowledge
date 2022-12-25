@@ -1,4 +1,4 @@
-;; Кошелек с множественной подписью
+;; Кошелек с мульти подписью
 
 _ unpack_state() inline_ref {
   ;; получаем данные из storage
@@ -109,7 +109,7 @@ _ unpack_owner_info(slice cs) inline_ref {
     ;; говорим, что запрос отработан (pending? нет => false => 0)
     pending_queries~udict_set_builder(64, query_id, begin_cell().store_int(0, 1));
     owner_infos~dec_flood(creator_i); ;; уменьшаем flood владельца запроса на 1
-  } else { ;; иначе обновляем информацию по данному
+  } else { ;; иначе обновляем информацию по данному запросу
     pending_queries~udict_set_builder(64, query_id, begin_cell()
       .store_uint(1, 1)
       .store_uint(creator_i, 8)
@@ -144,6 +144,7 @@ _ unpack_owner_info(slice cs) inline_ref {
   }
 
   ;; хотим проверить, что сообщение изначально подписано ключом root
+  ;; в данном контексте root - пользователь, вызвавший external метод
   slice root_signature = in_msg~load_bits(512);
   int root_hash = slice_hash(in_msg);
   int root_i = in_msg~load_uint(8);
@@ -271,25 +272,6 @@ cell create_init_state(int wallet_id, int n, int k, cell owners_info) method_id 
   return pack_state(new_dict(), owners_info, 0, k, n, wallet_id);
 }
 
-cell merge_list(cell a, cell b) {
-  if (cell_null?(a)) {
-    return b;
-  }
-  if (cell_null?(b)) {
-    return a;
-  }
-  slice as = a.begin_parse();
-  if (as.slice_refs() != 0) {
-    cell tail = merge_list(as~load_ref(), b);
-    return begin_cell().store_slice(as).store_ref(tail).end_cell();
-  }
-
-  as~skip_last_bits(1);
-  ;; as~skip_bits(1);
-  return begin_cell().store_slice(as).store_dict(b).end_cell();
-
-}
-
 cell get_public_keys() method_id {
   (_, _, _, _, cell public_keys, _) = unpack_state();
   return public_keys;
@@ -350,6 +332,25 @@ cell get_messages_unsigned() method_id {
 (int, int) get_n_k() method_id {
   (_, int n, int k, _, _, _) = unpack_state();
   return (n, k);
+}
+
+cell merge_list(cell a, cell b) {
+  if (cell_null?(a)) {
+    return b;
+  }
+  if (cell_null?(b)) {
+    return a;
+  }
+  slice as = a.begin_parse();
+  if (as.slice_refs() != 0) {
+    cell tail = merge_list(as~load_ref(), b);
+    return begin_cell().store_slice(as).store_ref(tail).end_cell();
+  }
+
+  as~skip_last_bits(1);
+  ;; as~skip_bits(1);
+  return begin_cell().store_slice(as).store_dict(b).end_cell();
+
 }
 
 ;; смержить запросы из a и b в один
